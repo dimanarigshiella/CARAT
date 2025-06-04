@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Assessment Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    
+    <!-- Add CryptoJS for local storage encryption -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
+    <style>
+        /* Animation for the Start New Assessment button */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Download prompt message */
+        .download-prompt {
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #17a2b8;
+        }
+    </style>
+</head>
+<body class="results-body">
+
+    <!-- User info and logout -->
+            <!-- Add this where your current logout button is -->
+    <div class="user-profile">
+        <div class="profile-icon">
+            <i class="fas fa-user"></i>
+        </div>
+        <div class="profile-dropdown">
+            <p><strong>Logged in as: </strong> {{ session.get('email', '') }} </p>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Log Out</a>
+        </div>
+    </div>
+
+    <div class="container results">
+        <h1>Risk Assessment Results</h1>
+        
+        <div class="summary">
+            <h2>Overall Risk Level: {{ risk_assessment.level|default('Not Available') }}</h2>
+            <p>Total Score: {{ total_score|default(0) }}</p>
+        </div>
+        
+        <div class="risk-details">
+            <h5>Risk Level Details</h5>
+            <table class="risk-table">
+                <thead>
+                    <tr class="no-border">
+                        <th>Score Range</th>
+                        <th>Risk Level</th>
+                        <th colspan="2">Length of Probation Period</th>
+                        <th>Intensity of Supervision</th>
+                    </tr>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th>Sentenced to 1 year Imprisonment or less</th>
+                        <th>All other Cases</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="{{ 'risk-highlighted' if total_score <= 17 else '' }}">17 and below</td>
+                        <td class="{{ 'risk-highlighted' if total_score <= 17 else '' }}">Low Risk (Level 1)</td>
+                        <td class="{{ 'sentence-highlighted' if total_score <= 17 and session.get('segment0', {}).get('length_of_sentence') in ['less-than-1', '1-year', '2-years', '2-years-or-less'] else '' }}">6 months</td>
+                        <td class="{{ 'sentence-highlighted' if total_score <= 17 and session.get('segment0', {}).get('length_of_sentence') in ['3-years', '4-years', '5-years', '6-years', 'above-2-years'] else '' }}">1 year</td>
+                        <td class="{{ 'risk-highlighted' if total_score <= 17 else '' }}">Once in 2 months</td>
+                    </tr>
+                    <tr>
+                        <td class="{{ 'risk-highlighted' if total_score > 17 and total_score <= 28 else '' }}">18 to 28</td>
+                        <td class="{{ 'risk-highlighted' if total_score > 17 and total_score <= 28 else '' }}">Medium Risk (Level 2)</td>
+                        <td class="{{ 'sentence-highlighted' if total_score > 17 and total_score <= 28 and session.get('segment0', {}).get('length_of_sentence') in ['less-than-1', '1-year', '2-years', '2-years-or-less'] else '' }}">6 months</td>
+                        <td class="{{ 'sentence-highlighted' if total_score > 17 and total_score <= 28 and session.get('segment0', {}).get('length_of_sentence') in ['3-years', '4-years', '5-years', '6-years', 'above-2-years'] else '' }}">1 year</td>
+                        <td class="{{ 'risk-highlighted' if total_score > 17 and total_score <= 28 else '' }}">Once a month</td>
+                    </tr>
+                    <tr>
+                        <td class="{{ 'risk-highlighted' if total_score > 28 and total_score <= 39 else '' }}">29 to 39</td>
+                        <td class="{{ 'risk-highlighted' if total_score > 28 and total_score <= 39 else '' }}">High Risk (Level 3)</td>
+                        <td class="{{ 'sentence-highlighted' if total_score > 28 and total_score <= 39 and session.get('segment0', {}).get('length_of_sentence') in ['less-than-1', '1-year', '2-years', '2-years-or-less'] else '' }}">1 year</td>
+                        <td class="{{ 'sentence-highlighted' if total_score > 28 and total_score <= 39 and session.get('segment0', {}).get('length_of_sentence') in ['3-years', '4-years', '5-years', '6-years', 'above-2-years'] else '' }}">2 years</td>
+                        <td class="{{ 'risk-highlighted' if total_score > 28 and total_score <= 39 else '' }}">Twice a month</td>
+                    </tr>
+                    <tr>
+                        <td class="{{ 'risk-highlighted' if total_score > 39 else '' }}">40 and above</td>
+                        <td class="{{ 'risk-highlighted' if total_score > 39 else '' }}">Very High Risk (Level 4)</td>
+                        <td class="{{ 'sentence-highlighted' if total_score > 39 and session.get('segment0', {}).get('length_of_sentence') in ['less-than-1', '1-year', '2-years', '2-years-or-less'] else '' }}">2 years</td>
+                        <td class="{{ 'sentence-highlighted' if total_score > 39 and session.get('segment0', {}).get('length_of_sentence') in ['3-years', '4-years', '5-years', '6-years', 'above-2-years'] else '' }}">3 years</td>
+                        <td class="{{ 'risk-highlighted' if total_score > 39 else '' }}">Twice a month</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="your-assessment">
+            <h2>Your Assessment</h2>
+            <p><strong>Risk Level:</strong> {{ risk_assessment.level }}</p>
+            <p><strong>Probation Period (if sentenced to 1 year imprisonment or less):</strong> {{ risk_assessment.probation_sentenced }}</p>
+            <p><strong>Probation Period (all other cases):</strong> {{ risk_assessment.probation_other }}</p>
+            <p><strong>Supervision Intensity:</strong> {{ risk_assessment.supervision }}</p>
+        </div>
+        
+        <div class="segment-scores">
+            <h5>Segment Scores</h5>
+            <table class="scores-table">
+                <thead>
+                    <tr>
+                        <th>Segment</th>
+                        <th>Score</th>
+                        <th>Threshold</th>
+                        <th>Program Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for segment_id in range(1, 9) %}
+                        {% if segment_id and subtotals and segment_thresholds %}
+                            {% if segment_id != 5 %}
+                                <!-- Regular segments -->
+                                <tr class="{{ 'above-threshold' if subtotals[segment_id] >= segment_thresholds[segment_id]['threshold'] else '' }}">
+                                    <td>{{ segment_titles[segment_id]|default('Unknown Segment') }}</td>
+                                    <td>{{ subtotals[segment_id]|default(0) }}</td>
+                                    <td>{{ segment_thresholds[segment_id]['threshold']|default(0) }}</td>
+                                    <td>
+                                        {% if subtotals[segment_id] >= segment_thresholds[segment_id]['threshold'] %}
+                                            {{ segment_thresholds[segment_id]['program']|default('No program specified') }} ✓
+                                        {% else %}
+                                            Not required
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <!-- Education row (first half of segment 5) -->
+                                <tr class="{{ 'above-threshold' if education_score >= segment_thresholds[5]['education']['threshold'] else '' }}">
+                                    <td>EDUCATION</td>
+                                    <td>{{ education_score|default(0) }}</td>
+                                    <td>{{ segment_thresholds[5]['education']['threshold']|default(0) }}</td>
+                                    <td>
+                                        {% if education_score >= segment_thresholds[5]['education']['threshold'] %}
+                                            {{ segment_thresholds[5]['program'] }} (EDUCATION) ✓
+                                        {% else %}
+                                            Not required
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                
+                                <!-- Employment row (second half of segment 5) -->
+                                <tr class="{{ 'above-threshold' if employment_score >= segment_thresholds[5]['employment']['threshold'] else '' }}">
+                                    <td>EMPLOYMENT</td>
+                                    <td>{{ employment_score|default(0) }}</td>
+                                    <td>{{ segment_thresholds[5]['employment']['threshold']|default(0) }}</td>
+                                    <td>
+                                        {% if employment_score >= segment_thresholds[5]['employment']['threshold'] %}
+                                            {{ segment_thresholds[5]['program'] }} (EMPLOYMENT) ✓
+                                        {% else %}
+                                            Not required
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td><strong>TOTAL</strong></td>
+                        <td><strong>{{ total_score|default(0) }}</strong></td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="programs">
+            <h1>Recommended Programs</h1>
+            <div class="program-list">
+                <h5>Supervision Programs:</h5>
+                <ul>
+                    {% for program in mandatory_programs %}
+                    <li>{{ program }}</li>
+                    {% endfor %}
+                </ul>
+                
+                <h5>Other Rehabilation Programs:</h5>
+                {% if recommended_programs %}
+                <ul>
+                    {% for program in recommended_programs %}
+                    <li>{{ program }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No additional programs recommended based on your assessment.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="notes-section">
+            <h5>Notes:</h5>
+            <textarea id="notes" class="notes" name="notes" rows="5" cols="80" placeholder="Enter your notes here...">{{ notes }}</textarea>
+            <button id="saveNotes" class="btn">Save Notes</button>
+        </div>
+
+        <div class="actions">
+            <button id="downloadPdf" class="btn btn-lg">Download PDF Report</button>
+            <a href="{{ url_for('index') }}" id="startNewAssessment" class="btn btn-lg" 
+               style="background-color: #28a745; color: white; margin-top: 15px; display: none; font-size: 1em; padding: 10px 20px; border-radius: 5px; font-weight: normal; text-transform: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                <i class="fas fa-redo"></i> Start New Assessment
+            </a>
+            <div class="download-prompt">
+                <i class="fas fa-info-circle"></i> Download your assessment results before starting a new assessment.
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- Keep script.js for reference but commented out - all functionality is now in main.js -->
+    <!-- <script src="{{ url_for('static', filename='js/script.js') }}"></script> -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const saveNotesBtn = document.getElementById('saveNotes');
+            const notesTextarea = document.getElementById('notes');
+            const downloadPdfBtn = document.getElementById('downloadPdf');
+            const startNewBtn = document.getElementById('startNewAssessment');
+            
+            // Function to get CSRF token
+            function getCsrfToken() {
+                const metaTag = document.querySelector('meta[name="csrf-token"]');
+                return metaTag ? metaTag.getAttribute('content') : '';
+            }
+            
+            // Function to show the start new assessment button
+            function showStartNewButton() {
+                console.log('Showing Start New Assessment button');
+                if (startNewBtn) {
+                    startNewBtn.style.display = 'inline-block';
+                }
+            }
+            
+            // Handle notes saving
+            if (saveNotesBtn && notesTextarea) {
+                saveNotesBtn.addEventListener('click', function() {
+                    const notes = notesTextarea.value;
+                    const formData = new FormData();
+                    formData.append('notes', notes);
+                    
+                    fetch('{{ url_for("save_notes") }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCsrfToken()
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            saveNotesBtn.textContent = 'Saved!';
+                            setTimeout(() => {
+                                saveNotesBtn.textContent = 'Save Notes';
+                            }, 2000);
+                        } else {
+                            saveNotesBtn.textContent = 'Error Saving!';
+                            setTimeout(() => {
+                                saveNotesBtn.textContent = 'Save Notes';
+                            }, 2000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        saveNotesBtn.textContent = 'Error Saving!';
+                        setTimeout(() => {
+                            saveNotesBtn.textContent = 'Save Notes';
+                        }, 2000);
+                    });
+                });
+            }
+            
+            // Add event listener for PDF download
+            if (downloadPdfBtn) {
+                downloadPdfBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Show loading state
+                    downloadPdfBtn.textContent = 'Generating PDF...';
+                    downloadPdfBtn.classList.add('generating');
+                    
+                    // Save notes before downloading PDF
+                    const notes = notesTextarea.value;
+                    const formData = new FormData();
+                    formData.append('notes', notes);
+                    
+                    // First save the notes
+                    fetch('{{ url_for("save_notes") }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCsrfToken()
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // After notes are saved, proceed with PDF download
+                            // Check if we're running in the PyInstaller bundle via webview
+                            const isWebview = navigator.userAgent.includes('PyWebView') || navigator.userAgent.includes('WebView');
+                            
+                            if (isWebview) {
+                                // Use the webview-specific route
+                                fetch('{{ url_for("webview_download_pdf") }}')
+                                    .then(response => {
+                                        if (response.ok) {
+                                            downloadPdfBtn.textContent = 'PDF Generated Successfully!';
+                                        } else {
+                                            downloadPdfBtn.textContent = 'Error Generating PDF';
+                                            console.error('Error response:', response.status);
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error:', error);
+                                        downloadPdfBtn.textContent = 'Error Generating PDF';
+                                    })
+                                    .finally(() => {
+                                        setTimeout(() => {
+                                            downloadPdfBtn.textContent = 'Download PDF Report';
+                                            downloadPdfBtn.classList.remove('generating');
+                                            showStartNewButton();
+                                        }, 2000);
+                                    });
+                            } else {
+                                // Regular browser approach - use a hidden iframe to prevent page reload
+                                const iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                iframe.src = '{{ url_for("direct_pdf_download") }}';
+                                document.body.appendChild(iframe);
+                                
+                                // Update button state after a delay
+                                setTimeout(() => {
+                                    downloadPdfBtn.textContent = 'PDF Generated Successfully!';
+                                    setTimeout(() => {
+                                        downloadPdfBtn.textContent = 'Download PDF Report';
+                                        downloadPdfBtn.classList.remove('generating');
+                                        showStartNewButton();
+                                        // Remove the iframe after download
+                                        document.body.removeChild(iframe);
+                                    }, 2000);
+                                }, 1000);
+                            }
+                        } else {
+                            console.error('Failed to save notes before PDF download');
+                            downloadPdfBtn.textContent = 'Error Saving Notes';
+                            setTimeout(() => {
+                                downloadPdfBtn.textContent = 'Download PDF Report';
+                                downloadPdfBtn.classList.remove('generating');
+                            }, 2000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error saving notes before PDF download:', error);
+                        downloadPdfBtn.textContent = 'Error Saving Notes';
+                        setTimeout(() => {
+                            downloadPdfBtn.textContent = 'Download PDF Report';
+                            downloadPdfBtn.classList.remove('generating');
+                        }, 2000);
+                    });
+                });
+            }
+            
+            // Add event listener for direct download link
+            const directDownloadLink = document.querySelector('.download-fallback a');
+            if (directDownloadLink) {
+                directDownloadLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Direct download clicked');
+                    
+                    // Show loading state on main button to provide feedback
+                    downloadPdfBtn.textContent = 'Generating PDF...';
+                    downloadPdfBtn.classList.add('generating');
+                    
+                    // Check if we're running in the PyInstaller bundle via webview
+                    const isWebview = navigator.userAgent.includes('PyWebView') || navigator.userAgent.includes('WebView');
+                    
+                    if (isWebview) {
+                        // Use the webview-specific route that directly saves and opens the PDF
+                        fetch('{{ url_for("webview_download_pdf") }}')
+                            .then(response => {
+                                if (response.ok) {
+                                    downloadPdfBtn.textContent = 'PDF Generated Successfully!';
+                                } else {
+                                    downloadPdfBtn.textContent = 'Error Generating PDF';
+                                    console.error('Error response:', response.status);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                downloadPdfBtn.textContent = 'Error Generating PDF';
+                            })
+                            .finally(() => {
+                                setTimeout(() => {
+                                    downloadPdfBtn.textContent = 'Download PDF Report';
+                                    downloadPdfBtn.classList.remove('generating');
+                                    showStartNewButton();
+                                }, 2000);
+                            });
+                    } else {
+                        // Regular browser approach - use a hidden iframe to prevent page reload
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        iframe.src = '{{ url_for("direct_pdf_download") }}';
+                        document.body.appendChild(iframe);
+                        
+                        // Update button state after a delay
+                        setTimeout(() => {
+                            downloadPdfBtn.textContent = 'PDF Generated Successfully!';
+                            setTimeout(() => {
+                                downloadPdfBtn.textContent = 'Download PDF Report';
+                                downloadPdfBtn.classList.remove('generating');
+                                showStartNewButton();
+                                // Remove the iframe after download
+                                document.body.removeChild(iframe);
+                            }, 2000);
+                        }, 1000);
+                    }
+                });
+            }
+            
+            // Add event listener for Start New Assessment button
+            if (startNewBtn) {
+                startNewBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Clear notes textarea immediately
+                    if (notesTextarea) {
+                        notesTextarea.value = '';
+                    }
+                    
+                    // Save empty notes to ensure they're cleared in the session
+                    const formData = new FormData();
+                    formData.append('notes', '');
+                    
+                    fetch('{{ url_for("save_notes") }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCsrfToken()
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Only redirect after notes are cleared
+                            window.location.href = '{{ url_for("index") }}';
+                        } else {
+                            console.error('Failed to clear notes');
+                            // Still redirect even if clearing fails
+                            window.location.href = '{{ url_for("index") }}';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error clearing notes:', error);
+                        // Still redirect even if clearing fails
+                        window.location.href = '{{ url_for("index") }}';
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>
